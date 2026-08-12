@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { pdf } from "@react-pdf/renderer";
-import { Download, PackageCheck, Scale, Send, Truck } from "lucide-react";
+import { CheckCircle2, Download, PackageCheck, Scale, Send, Truck } from "lucide-react";
 import BordereauPDF from "@/components/BordereauPDF";
 import { calculerPoidsRetenu, calculerPoidsVolumetrique, genererNumeroBordereau } from "@/lib/calculs";
 import { genererQRCodeDataUrl } from "@/lib/qrcode";
+import { enregistrerBordereau } from "@/lib/supabase";
 import { construireMessageBordereau, genererLienWhatsApp } from "@/lib/whatsapp";
 import { ENTREPOT_EXPEDITEUR, INDICATIFS_PAYS, TERRITOIRES, type Bordereau, type Territoire } from "@/types/bordereau";
 
@@ -31,6 +32,8 @@ export default function PageBordereau() {
   const [hauteur, setHauteur] = useState(0);
   const [numero] = useState(() => genererNumeroBordereau());
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
   const poidsVolumetrique = useMemo(() => calculerPoidsVolumetrique(longueur, largeur, hauteur), [longueur, largeur, hauteur]);
@@ -47,6 +50,26 @@ export default function PageBordereau() {
     poidsVolumetrique,
     poidsRetenu,
   });
+
+  async function envoyerDemande() {
+    if (!valide) {
+      setErreur("Merci de compléter tous les champs obligatoires avant d'envoyer la demande.");
+      return;
+    }
+
+    setErreur(null);
+    setSaving(true);
+    try {
+      await enregistrerBordereau(construireBordereau());
+      setSaved(true);
+    } catch (error) {
+      console.error(error);
+      setSaved(false);
+      setErreur(error instanceof Error ? error.message : "Impossible d'enregistrer la demande. Réessayez.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function genererPDF() {
     if (!valide) { setErreur("Merci de compléter tous les champs obligatoires avant de générer le bordereau."); return; }
@@ -80,17 +103,18 @@ export default function PageBordereau() {
       <div className="mx-auto mt-8 grid max-w-6xl grid-cols-1 gap-6 px-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <section className="rounded-2xl border border-[#EADFD3] bg-white p-6 shadow-sm"><h2 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-se-primaire"><Truck size={16}/>Destinataire</h2><div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div><label className={labelClass}>Nom</label><input className={inputClass} value={nom} onChange={e=>setNom(e.target.value)} placeholder="Dupont" /></div><div><label className={labelClass}>Prénom</label><input className={inputClass} value={prenom} onChange={e=>setPrenom(e.target.value)} placeholder="Marie" /></div>
-            <div className="sm:col-span-2"><label className={labelClass}>Adresse (rue)</label><input className={inputClass} value={rue} onChange={e=>setRue(e.target.value)} placeholder="12 rue des Flamboyants" /></div>
-            <div><label className={labelClass}>Code postal</label><input className={inputClass} value={codePostal} onChange={e=>setCodePostal(e.target.value)} placeholder="97200" /></div><div><label className={labelClass}>Ville</label><input className={inputClass} value={ville} onChange={e=>setVille(e.target.value)} placeholder="Fort-de-France" /></div>
-            <div><label className={labelClass}>Territoire</label><select className={inputClass} value={territoire} onChange={e=>setTerritoire(e.target.value as Territoire)}>{TERRITOIRES.map(t=><option key={t}>{t}</option>)}</select></div>
-            <div className="flex gap-2"><div className="w-32"><label className={labelClass}>Indicatif</label><select className={inputClass} value={indicatifPays} onChange={e=>setIndicatifPays(e.target.value)}>{INDICATIFS_PAYS.map(i=><option key={i.code} value={i.code}>{i.code}</option>)}</select></div><div className="flex-1"><label className={labelClass}>Téléphone WhatsApp</label><input className={inputClass} value={telephoneWhatsapp} onChange={e=>setTelephoneWhatsapp(e.target.value)} placeholder="6 07 39 51 78" /></div></div>
+            <div><label className={labelClass}>Nom</label><input className={inputClass} value={nom} onChange={e=>{setNom(e.target.value);setSaved(false)}} placeholder="Dupont" /></div><div><label className={labelClass}>Prénom</label><input className={inputClass} value={prenom} onChange={e=>{setPrenom(e.target.value);setSaved(false)}} placeholder="Marie" /></div>
+            <div className="sm:col-span-2"><label className={labelClass}>Adresse (rue)</label><input className={inputClass} value={rue} onChange={e=>{setRue(e.target.value);setSaved(false)}} placeholder="12 rue des Flamboyants" /></div>
+            <div><label className={labelClass}>Code postal</label><input className={inputClass} value={codePostal} onChange={e=>{setCodePostal(e.target.value);setSaved(false)}} placeholder="97200" /></div><div><label className={labelClass}>Ville</label><input className={inputClass} value={ville} onChange={e=>{setVille(e.target.value);setSaved(false)}} placeholder="Fort-de-France" /></div>
+            <div><label className={labelClass}>Territoire</label><select className={inputClass} value={territoire} onChange={e=>{setTerritoire(e.target.value as Territoire);setSaved(false)}}>{TERRITOIRES.map(t=><option key={t}>{t}</option>)}</select></div>
+            <div className="flex gap-2"><div className="w-32"><label className={labelClass}>Indicatif</label><select className={inputClass} value={indicatifPays} onChange={e=>{setIndicatifPays(e.target.value);setSaved(false)}}>{INDICATIFS_PAYS.map(i=><option key={i.code} value={i.code}>{i.code}</option>)}</select></div><div className="flex-1"><label className={labelClass}>Téléphone WhatsApp</label><input className={inputClass} value={telephoneWhatsapp} onChange={e=>{setTelephoneWhatsapp(e.target.value);setSaved(false)}} placeholder="6 07 39 51 78" /></div></div>
           </div></section>
-          <section className="rounded-2xl border border-[#EADFD3] bg-white p-6 shadow-sm"><h2 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-se-primaire"><PackageCheck size={16}/>Déclaration du colis & douane</h2><div className="grid grid-cols-1 gap-4 sm:grid-cols-3"><div className="sm:col-span-3"><label className={labelClass}>Description des articles</label><input className={inputClass} value={description} onChange={e=>setDescription(e.target.value)} placeholder="Sac, vêtements, accessoires..." /></div><NumberField label="Valeur déclarée (€)" value={valeurDeclaree} setValue={setValeurDeclaree} step="0.01" placeholder="120.00" /><NumberField label="Nombre de colis" value={nombreColis} setValue={v=>setNombreColis(Math.max(1,v))} /></div></section>
-          <section className="rounded-2xl border border-[#EADFD3] bg-white p-6 shadow-sm"><h2 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-se-primaire"><Scale size={16}/>Calculateur de poids</h2><div className="grid grid-cols-1 gap-4 sm:grid-cols-4"><NumberField label="Poids réel (kg)" value={poidsReel} setValue={setPoidsReel} step="0.01" placeholder="3.20"/><NumberField label="Longueur (cm)" value={longueur} setValue={setLongueur} placeholder="40"/><NumberField label="Largeur (cm)" value={largeur} setValue={setLargeur} placeholder="30"/><NumberField label="Hauteur (cm)" value={hauteur} setValue={setHauteur} placeholder="25"/></div><div className="mt-5 grid grid-cols-1 gap-3 rounded-xl bg-se-carte p-4 sm:grid-cols-3"><div><p className="text-xs uppercase text-[#6B5A4F]">Poids réel</p><p className="text-lg font-bold">{poidsReel.toFixed(2)} kg</p></div><div><p className="text-xs uppercase text-[#6B5A4F]">Poids volumétrique</p><p className="text-lg font-bold">{poidsVolumetrique.toFixed(2)} kg</p><p className="text-[11px] text-[#8A7A6E]">(L × l × H) / 5000</p></div><div><p className="text-xs uppercase text-se-primaire">Poids retenu</p><p className="text-xl font-extrabold text-se-primaire">{poidsRetenu.toFixed(2)} kg</p><p className="text-[11px] text-[#8A7A6E]">{poidsVolumetrique > poidsReel ? "Volumétrique retenu" : "Poids réel retenu"}</p></div></div></section>
+          <section className="rounded-2xl border border-[#EADFD3] bg-white p-6 shadow-sm"><h2 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-se-primaire"><PackageCheck size={16}/>Déclaration du colis & douane</h2><div className="grid grid-cols-1 gap-4 sm:grid-cols-3"><div className="sm:col-span-3"><label className={labelClass}>Description des articles</label><input className={inputClass} value={description} onChange={e=>{setDescription(e.target.value);setSaved(false)}} placeholder="Sac, vêtements, accessoires..." /></div><NumberField label="Valeur déclarée (€)" value={valeurDeclaree} setValue={v=>{setValeurDeclaree(v);setSaved(false)}} step="0.01" placeholder="120.00" /><NumberField label="Nombre de colis" value={nombreColis} setValue={v=>{setNombreColis(Math.max(1,v));setSaved(false)}} /></div></section>
+          <section className="rounded-2xl border border-[#EADFD3] bg-white p-6 shadow-sm"><h2 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-se-primaire"><Scale size={16}/>Calculateur de poids</h2><div className="grid grid-cols-1 gap-4 sm:grid-cols-4"><NumberField label="Poids réel (kg)" value={poidsReel} setValue={v=>{setPoidsReel(v);setSaved(false)}} step="0.01" placeholder="3.20"/><NumberField label="Longueur (cm)" value={longueur} setValue={v=>{setLongueur(v);setSaved(false)}} placeholder="40"/><NumberField label="Largeur (cm)" value={largeur} setValue={v=>{setLargeur(v);setSaved(false)}} placeholder="30"/><NumberField label="Hauteur (cm)" value={hauteur} setValue={v=>{setHauteur(v);setSaved(false)}} placeholder="25"/></div><div className="mt-5 grid grid-cols-1 gap-3 rounded-xl bg-se-carte p-4 sm:grid-cols-3"><div><p className="text-xs uppercase text-[#6B5A4F]">Poids réel</p><p className="text-lg font-bold">{poidsReel.toFixed(2)} kg</p></div><div><p className="text-xs uppercase text-[#6B5A4F]">Poids volumétrique</p><p className="text-lg font-bold">{poidsVolumetrique.toFixed(2)} kg</p><p className="text-[11px] text-[#8A7A6E]">(L × l × H) / 5000</p></div><div><p className="text-xs uppercase text-se-primaire">Poids retenu</p><p className="text-xl font-extrabold text-se-primaire">{poidsRetenu.toFixed(2)} kg</p><p className="text-[11px] text-[#8A7A6E]">{poidsVolumetrique > poidsReel ? "Volumétrique retenu" : "Poids réel retenu"}</p></div></div></section>
+          {saved && <p role="status" className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"><CheckCircle2 size={17}/>Demande enregistrée avec succès. Le bordereau {numero} est maintenant reçu par Sun Express.</p>}
           {erreur && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{erreur}</p>}
         </div>
-        <aside><div className="sticky top-6 space-y-4 rounded-2xl border border-[#EADFD3] bg-white p-6 shadow-sm"><h2 className="text-sm font-bold uppercase tracking-wide text-se-primaire">Récapitulatif</h2><div className="space-y-2 text-sm"><Recap label="Destinataire" value={prenom || nom ? `${prenom} ${nom}` : "—"}/><Recap label="Territoire" value={territoire}/><Recap label="Nb. colis" value={String(nombreColis)}/><Recap label="Valeur déclarée" value={`${valeurDeclaree.toFixed(2)} €`}/><Recap label="Poids retenu" value={`${poidsRetenu.toFixed(2)} kg`} accent/></div><div className="space-y-3 pt-2"><button onClick={genererPDF} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-se-primaire px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#6E1D0E] disabled:opacity-60"><Download size={16}/>{busy ? "Génération..." : "Télécharger le bordereau PDF"}</button><button onClick={partagerWhatsApp} className="flex w-full items-center justify-center gap-2 rounded-lg border border-se-primaire bg-white px-4 py-3 text-sm font-semibold text-se-primaire transition hover:bg-se-carte"><Send size={16}/>Partager sur WhatsApp</button></div><p className="pt-1 text-[11px] leading-relaxed text-[#8A7A6E]">Les champs obligatoires doivent être renseignés avant de générer le bordereau ou d'envoyer le message WhatsApp.</p></div></aside>
+        <aside><div className="sticky top-6 space-y-4 rounded-2xl border border-[#EADFD3] bg-white p-6 shadow-sm"><h2 className="text-sm font-bold uppercase tracking-wide text-se-primaire">Récapitulatif</h2><div className="space-y-2 text-sm"><Recap label="Destinataire" value={prenom || nom ? `${prenom} ${nom}` : "—"}/><Recap label="Territoire" value={territoire}/><Recap label="Nb. colis" value={String(nombreColis)}/><Recap label="Valeur déclarée" value={`${valeurDeclaree.toFixed(2)} €`}/><Recap label="Poids retenu" value={`${poidsRetenu.toFixed(2)} kg`} accent/></div><div className="space-y-3 pt-2"><button onClick={envoyerDemande} disabled={saving || saved} className="flex w-full items-center justify-center gap-2 rounded-lg bg-se-primaire px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#6E1D0E] disabled:opacity-60"><Send size={16}/>{saving ? "Envoi en cours..." : saved ? "Demande envoyée" : "Envoyer la demande"}</button><button onClick={genererPDF} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-lg border border-se-primaire bg-white px-4 py-3 text-sm font-semibold text-se-primaire transition hover:bg-se-carte disabled:opacity-60"><Download size={16}/>{busy ? "Génération..." : "Télécharger le bordereau PDF"}</button><button onClick={partagerWhatsApp} className="flex w-full items-center justify-center gap-2 rounded-lg border border-[#E4D5C7] bg-white px-4 py-3 text-sm font-semibold text-se-primaire transition hover:bg-se-carte"><Send size={16}/>Partager sur WhatsApp</button></div><p className="pt-1 text-[11px] leading-relaxed text-[#8A7A6E]">Les champs obligatoires doivent être renseignés avant d'envoyer la demande, générer le PDF ou partager sur WhatsApp.</p></div></aside>
       </div>
     </main>
   );
