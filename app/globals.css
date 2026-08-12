@@ -2,7 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+html,
+body {
+  min-height: 100%;
+}
+
 body {
   @apply bg-se-fond text-se-texte;
 }
 
+button,
+input,
+select {
+  font: inherit;
+}

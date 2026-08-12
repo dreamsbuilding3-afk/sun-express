@@ -50,10 +50,6 @@ export interface Bordereau {
   poidsRetenu: number;
 }
 
-/**
- * Adresse de l'entrepôt en France. À adapter avec la vraie adresse
- * de réception des colis avant mise en production.
- */
 export const ENTREPOT_EXPEDITEUR: Expediteur = {
   nom: "SUN EXPRESS – Entrepôt de réexpédition",
   rue: "Adresse de l'entrepôt à compléter",
@@ -72,11 +68,9 @@ export const TERRITOIRES: Territoire[] = [
   "La Réunion",
 ];
 
-/** Indicatifs téléphoniques usuels pour les territoires desservis. */
-export const INDICATIFS_PAYS: { code: string; label: string }[] = [
+export const INDICATIFS_PAYS = [
   { code: "+596", label: "+596 (Martinique)" },
   { code: "+590", label: "+590 (Guadeloupe / St-Martin)" },
   { code: "+594", label: "+594 (Guyane)" },
   { code: "+262", label: "+262 (La Réunion)" },
 ];
-
