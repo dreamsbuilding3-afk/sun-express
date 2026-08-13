@@ -43,14 +43,14 @@ export default function PageBordereau() {
   async function envoyerDemande() { await enregistrerDemande(); }
 
   async function genererPDF() {
-    if (!(await enregistrerDemande())) return;
+    if (!valide) { setErreur("Merci de compléter tous les champs obligatoires avant de générer le bordereau."); return; }
     setErreur(null); setBusy(true);
     try { const bordereau = construireBordereau(); const qr = await genererQRCodeDataUrl(`SUNEXPRESS|${bordereau.numero}|${bordereau.destinataire.nom}`); const blob = await pdf(<BordereauPDF bordereau={bordereau} qrCodeDataUrl={qr} />).toBlob(); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `Bordereau-SunExpress-${bordereau.numero}.pdf`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
     catch (error) { console.error(error); setErreur("Une erreur est survenue lors de la génération du PDF. Réessayez."); } finally { setBusy(false); }
   }
 
-  async function partagerWhatsApp() {
-    if (!(await enregistrerDemande())) return;
+  function partagerWhatsApp() {
+    if (!valide) { setErreur("Merci de compléter tous les champs obligatoires avant de partager sur WhatsApp."); return; }
     setErreur(null); const bordereau = construireBordereau(); window.open(genererLienWhatsApp(telephoneWhatsapp, indicatifPays, construireMessageBordereau(bordereau)), "_blank", "noopener,noreferrer");
   }
 
@@ -70,9 +70,9 @@ export default function PageBordereau() {
     </div>
     <aside><div className="sticky top-6 space-y-4 rounded-2xl border border-[#EADFD3] bg-white p-6 shadow-sm"><h2 className="text-sm font-bold uppercase tracking-wide text-se-primaire">Récapitulatif</h2><div className="space-y-2 text-sm"><Recap label="Destinataire" value={prenom || nom ? `${prenom} ${nom}` : "—"}/><Recap label="Territoire" value={territoire}/><Recap label="Nb. colis" value={String(nombreColis)}/><Recap label="Valeur déclarée" value={`${valeurDeclaree.toFixed(2)} €`}/><Recap label="Poids retenu" value={`${poidsRetenu.toFixed(2)} kg`} accent/></div><div className="space-y-3 pt-2">
       <button onClick={envoyerDemande} disabled={sending || sent} className="flex w-full items-center justify-center gap-2 rounded-lg bg-se-primaire px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#6E1D0E] disabled:cursor-not-allowed disabled:opacity-60"><Send size={16}/>{sending ? "Envoi en cours..." : sent ? "Demande envoyée ✓" : "Envoyer ma demande à Sun Express"}</button>
-      <button onClick={genererPDF} disabled={busy || sending} className="flex w-full items-center justify-center gap-2 rounded-lg border border-se-primaire bg-white px-4 py-3 text-sm font-semibold text-se-primaire transition hover:bg-se-carte disabled:opacity-60"><Download size={16}/>{busy ? "Génération..." : "Télécharger le bordereau PDF"}</button>
+      <button onClick={genererPDF} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-lg border border-se-primaire bg-white px-4 py-3 text-sm font-semibold text-se-primaire transition hover:bg-se-carte disabled:opacity-60"><Download size={16}/>{busy ? "Génération..." : "Télécharger le bordereau PDF"}</button>
       <button onClick={partagerWhatsApp} disabled={sending} className="flex w-full items-center justify-center gap-2 rounded-lg border border-se-primaire bg-white px-4 py-3 text-sm font-semibold text-se-primaire transition hover:bg-se-carte disabled:opacity-60"><Send size={16}/>Partager sur WhatsApp</button>
-    </div><p className="pt-1 text-[11px] leading-relaxed text-[#8A7A6E]">La demande est enregistrée automatiquement dans l'espace Sun Express. Le PDF et WhatsApp restent disponibles ensuite.</p></div></aside></div>
+    </div><p className="pt-1 text-[11px] leading-relaxed text-[#8A7A6E]">Le bouton d'envoi enregistre la demande dans l'espace Sun Express. Le PDF et WhatsApp restent disponibles indépendamment.</p></div></aside></div>
   </main>;
 }
 
