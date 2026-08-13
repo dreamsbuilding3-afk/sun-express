@@ -31,16 +31,16 @@ export default function PageBordereau() {
     setErreur(null); setSending(true);
     try {
       const bordereau = construireBordereau();
-      const { error } = await getSupabase().from("shipping_requests").insert({ client_id: null, status: "pending", document_number: bordereau.numero, recipient: bordereau.destinataire, declaration: bordereau.declaration, dimensions: { ...bordereau.dimensions, poidsVolumetrique: bordereau.poidsVolumetrique, poidsRetenu: bordereau.poidsRetenu } });
+      const supabase = getSupabase();
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase.from("shipping_requests").insert({ client_id: user?.id ?? null, status: "pending", document_number: bordereau.numero, recipient: bordereau.destinataire, declaration: bordereau.declaration, dimensions: { ...bordereau.dimensions, poidsVolumetrique: bordereau.poidsVolumetrique, poidsRetenu: bordereau.poidsRetenu } });
       if (error) throw error;
       setSent(true); return true;
     } catch (error) { console.error(error); setErreur(error instanceof Error ? `Impossible d'envoyer la demande : ${error.message}` : "Impossible d'envoyer la demande à Sun Express."); return false; }
     finally { setSending(false); }
   }
 
-  async function envoyerDemande() {
-    await enregistrerDemande();
-  }
+  async function envoyerDemande() { await enregistrerDemande(); }
 
   async function genererPDF() {
     if (!(await enregistrerDemande())) return;
