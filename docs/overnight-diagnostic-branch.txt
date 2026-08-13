@@ -1,1 +1,0 @@
-This branch contains only a planned UX correction; Supabase production configuration remains untouched.
