@@ -7,6 +7,7 @@ import BordereauPDF from "@/components/BordereauPDF";
 import { calculerPoidsRetenu, calculerPoidsVolumetrique, genererNumeroBordereau } from "@/lib/calculs";
 import { genererQRCodeDataUrl } from "@/lib/qrcode";
 import { construireMessageBordereau, genererLienWhatsApp } from "@/lib/whatsapp";
+import { getSupabase } from "@/lib/supabase";
 import { ENTREPOT_EXPEDITEUR, INDICATIFS_PAYS, TERRITOIRES, type Bordereau, type Territoire } from "@/types/bordereau";
 
 const inputClass = "w-full rounded-lg border border-[#E4D5C7] bg-white px-3 py-2 text-sm text-se-texte placeholder:text-[#B8A99C] focus:border-se-primaire focus:outline-none focus:ring-2 focus:ring-se-primaire/15 transition";
@@ -32,6 +33,7 @@ export default function PageBordereau() {
   const [numero] = useState(() => genererNumeroBordereau());
   const [busy, setBusy] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [envoye, setEnvoye] = useState(false);
 
   const poidsVolumetrique = useMemo(() => calculerPoidsVolumetrique(longueur, largeur, hauteur), [longueur, largeur, hauteur]);
   const poidsRetenu = useMemo(() => calculerPoidsRetenu(poidsReel, poidsVolumetrique), [poidsReel, poidsVolumetrique]);
@@ -48,10 +50,44 @@ export default function PageBordereau() {
     poidsRetenu,
   });
 
+  async function enregistrerDemande() {
+    if (!valide) {
+      setErreur("Merci de compléter tous les champs obligatoires avant d'envoyer la demande.");
+      return false;
+    }
+    if (envoye) return true;
+
+    const bordereau = construireBordereau();
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from("shipping_requests").insert({
+      client_id: user?.id ?? null,
+      status: "pending",
+      document_number: bordereau.numero,
+      recipient: bordereau.destinataire,
+      declaration: bordereau.declaration,
+      dimensions: { ...bordereau.dimensions, poidsVolumetrique: bordereau.poidsVolumetrique, poidsRetenu: bordereau.poidsRetenu },
+    });
+    if (error) throw error;
+    setEnvoye(true);
+    return true;
+  }
+
+  async function envoyerDemande() {
+    setErreur(null); setBusy(true);
+    try {
+      await enregistrerDemande();
+    } catch (error) {
+      console.error(error);
+      setErreur("La demande n'a pas pu être enregistrée. Réessayez.");
+    } finally { setBusy(false); }
+  }
+
   async function genererPDF() {
     if (!valide) { setErreur("Merci de compléter tous les champs obligatoires avant de générer le bordereau."); return; }
     setErreur(null); setBusy(true);
     try {
+      await enregistrerDemande();
       const bordereau = construireBordereau();
       const qr = await genererQRCodeDataUrl(`SUNEXPRESS|${bordereau.numero}|${bordereau.destinataire.nom}`);
       const blob = await pdf(<BordereauPDF bordereau={bordereau} qrCodeDataUrl={qr} />).toBlob();
@@ -59,15 +95,19 @@ export default function PageBordereau() {
       const link = document.createElement("a");
       link.href = url; link.download = `Bordereau-SunExpress-${bordereau.numero}.pdf`; link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (error) { console.error(error); setErreur("Une erreur est survenue lors de la génération du PDF. Réessayez."); }
+    } catch (error) { console.error(error); setErreur("Une erreur est survenue lors de l'enregistrement ou de la génération du PDF."); }
     finally { setBusy(false); }
   }
 
-  function partagerWhatsApp() {
+  async function partagerWhatsApp() {
     if (!valide) { setErreur("Merci de compléter tous les champs obligatoires avant de partager sur WhatsApp."); return; }
-    setErreur(null);
-    const bordereau = construireBordereau();
-    window.open(genererLienWhatsApp(telephoneWhatsapp, indicatifPays, construireMessageBordereau(bordereau)), "_blank", "noopener,noreferrer");
+    setErreur(null); setBusy(true);
+    try {
+      await enregistrerDemande();
+      const bordereau = construireBordereau();
+      window.open(genererLienWhatsApp(telephoneWhatsapp, indicatifPays, construireMessageBordereau(bordereau)), "_blank", "noopener,noreferrer");
+    } catch (error) { console.error(error); setErreur("La demande n'a pas pu être enregistrée avant le partage WhatsApp."); }
+    finally { setBusy(false); }
   }
 
   const NumberField = ({ label, value, setValue, step = "1", placeholder }: { label: string; value: number; setValue: (v: number) => void; step?: string; placeholder?: string }) => (
@@ -89,8 +129,9 @@ export default function PageBordereau() {
           <section className="rounded-2xl border border-[#EADFD3] bg-white p-6 shadow-sm"><h2 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-se-primaire"><PackageCheck size={16}/>Déclaration du colis & douane</h2><div className="grid grid-cols-1 gap-4 sm:grid-cols-3"><div className="sm:col-span-3"><label className={labelClass}>Description des articles</label><input className={inputClass} value={description} onChange={e=>setDescription(e.target.value)} placeholder="Sac, vêtements, accessoires..." /></div><NumberField label="Valeur déclarée (€)" value={valeurDeclaree} setValue={setValeurDeclaree} step="0.01" placeholder="120.00" /><NumberField label="Nombre de colis" value={nombreColis} setValue={v=>setNombreColis(Math.max(1,v))} /></div></section>
           <section className="rounded-2xl border border-[#EADFD3] bg-white p-6 shadow-sm"><h2 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-se-primaire"><Scale size={16}/>Calculateur de poids</h2><div className="grid grid-cols-1 gap-4 sm:grid-cols-4"><NumberField label="Poids réel (kg)" value={poidsReel} setValue={setPoidsReel} step="0.01" placeholder="3.20"/><NumberField label="Longueur (cm)" value={longueur} setValue={setLongueur} placeholder="40"/><NumberField label="Largeur (cm)" value={largeur} setValue={setLargeur} placeholder="30"/><NumberField label="Hauteur (cm)" value={hauteur} setValue={setHauteur} placeholder="25"/></div><div className="mt-5 grid grid-cols-1 gap-3 rounded-xl bg-se-carte p-4 sm:grid-cols-3"><div><p className="text-xs uppercase text-[#6B5A4F]">Poids réel</p><p className="text-lg font-bold">{poidsReel.toFixed(2)} kg</p></div><div><p className="text-xs uppercase text-[#6B5A4F]">Poids volumétrique</p><p className="text-lg font-bold">{poidsVolumetrique.toFixed(2)} kg</p><p className="text-[11px] text-[#8A7A6E]">(L × l × H) / 5000</p></div><div><p className="text-xs uppercase text-se-primaire">Poids retenu</p><p className="text-xl font-extrabold text-se-primaire">{poidsRetenu.toFixed(2)} kg</p><p className="text-[11px] text-[#8A7A6E]">{poidsVolumetrique > poidsReel ? "Volumétrique retenu" : "Poids réel retenu"}</p></div></div></section>
           {erreur && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{erreur}</p>}
+          {envoye && <p className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">Demande enregistrée avec succès. Votre bordereau peut maintenant être téléchargé ou partagé.</p>}
         </div>
-        <aside><div className="sticky top-6 space-y-4 rounded-2xl border border-[#EADFD3] bg-white p-6 shadow-sm"><h2 className="text-sm font-bold uppercase tracking-wide text-se-primaire">Récapitulatif</h2><div className="space-y-2 text-sm"><Recap label="Destinataire" value={prenom || nom ? `${prenom} ${nom}` : "—"}/><Recap label="Territoire" value={territoire}/><Recap label="Nb. colis" value={String(nombreColis)}/><Recap label="Valeur déclarée" value={`${valeurDeclaree.toFixed(2)} €`}/><Recap label="Poids retenu" value={`${poidsRetenu.toFixed(2)} kg`} accent/></div><div className="space-y-3 pt-2"><button onClick={genererPDF} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-se-primaire px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#6E1D0E] disabled:opacity-60"><Download size={16}/>{busy ? "Génération..." : "Télécharger le bordereau PDF"}</button><button onClick={partagerWhatsApp} className="flex w-full items-center justify-center gap-2 rounded-lg border border-se-primaire bg-white px-4 py-3 text-sm font-semibold text-se-primaire transition hover:bg-se-carte"><Send size={16}/>Partager sur WhatsApp</button></div><p className="pt-1 text-[11px] leading-relaxed text-[#8A7A6E]">Les champs obligatoires doivent être renseignés avant de générer le bordereau ou d'envoyer le message WhatsApp.</p></div></aside>
+        <aside><div className="sticky top-6 space-y-4 rounded-2xl border border-[#EADFD3] bg-white p-6 shadow-sm"><h2 className="text-sm font-bold uppercase tracking-wide text-se-primaire">Récapitulatif</h2><div className="space-y-2 text-sm"><Recap label="Destinataire" value={prenom || nom ? `${prenom} ${nom}` : "—"}/><Recap label="Territoire" value={territoire}/><Recap label="Nb. colis" value={String(nombreColis)}/><Recap label="Valeur déclarée" value={`${valeurDeclaree.toFixed(2)} €`}/><Recap label="Poids retenu" value={`${poidsRetenu.toFixed(2)} kg`} accent/></div><div className="space-y-3 pt-2"><button onClick={envoyerDemande} disabled={busy || envoye} className="flex w-full items-center justify-center gap-2 rounded-lg bg-se-primaire px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#6E1D0E] disabled:opacity-60"><Send size={16}/>{envoye ? "Demande envoyée" : busy ? "Enregistrement..." : "Envoyer ma demande à Sun Express"}</button><button onClick={genererPDF} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-lg border border-se-primaire bg-white px-4 py-3 text-sm font-semibold text-se-primaire transition hover:bg-se-carte disabled:opacity-60"><Download size={16}/>{busy ? "Traitement..." : "Télécharger le bordereau PDF"}</button><button onClick={partagerWhatsApp} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-lg border border-se-primaire bg-white px-4 py-3 text-sm font-semibold text-se-primaire transition hover:bg-se-carte disabled:opacity-60"><Send size={16}/>Partager sur WhatsApp</button></div><p className="pt-1 text-[11px] leading-relaxed text-[#8A7A6E]">L'envoi enregistre la demande dans le logiciel. Le PDF et WhatsApp sont ensuite disponibles pour le client.</p></div></aside>
       </div>
     </main>
   );
