@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" role="img" aria-label="SUN express">
+  <rect width="300" height="300" rx="8" fill="#4b0000"/>
+  <g stroke="#d8ad4a" stroke-width="2" stroke-linecap="round" opacity="0.95">
+    <path d="M150 42v46"/><path d="M150 212v46"/><path d="M42 150h46"/><path d="M212 150h46"/>
+    <path d="M74 74l33 33"/><path d="M193 193l33 33"/><path d="M226 74l-33 33"/><path d="M107 193l-33 33"/>
+    <path d="M107 51l18 43"/><path d="M175 206l18 43"/><path d="M51 107l43 18"/><path d="M206 175l43 18"/>
+    <path d="M193 51l-18 43"/><path d="M125 206l-18 43"/><path d="M249 107l-43 18"/><path d="M94 175l-43 18"/>
+  </g>
+  <text x="150" y="158" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="700" fill="#ffd447">SUN</text>
+  <text x="150" y="196" text-anchor="middle" font-family="cursive" font-size="38" font-style="italic" fill="#d8ad4a">express</text>
+</svg>
