@@ -16,3 +16,26 @@ input,
 select {
   font: inherit;
 }
+
+/* Sun Express branding: the supplied logo sits beside the brand name on every primary header. */
+header.bg-se-primaire {
+  background-image: url('/sun-express-logo.svg');
+  background-repeat: no-repeat;
+  background-position: 24px center;
+  background-size: 58px 58px;
+}
+
+header.bg-se-primaire > div {
+  padding-left: 76px;
+}
+
+@media (max-width: 640px) {
+  header.bg-se-primaire {
+    background-position: 16px center;
+    background-size: 48px 48px;
+  }
+
+  header.bg-se-primaire > div {
+    padding-left: 62px;
+  }
+}
