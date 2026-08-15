@@ -4,6 +4,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Sun Express — Bordereaux d'expédition",
   description: "Génération de bordereaux d'expédition pour la réexpédition de colis France → Antilles/Guyane.",
+  icons: {
+    icon: "/sun-express-logo.svg",
+    shortcut: "/sun-express-logo.svg",
+    apple: "/sun-express-logo.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
